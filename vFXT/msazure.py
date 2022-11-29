@@ -526,15 +526,20 @@ class Service(ServiceBase):
             if self.use_environment_for_auth:
                 # get_client_from_cli_profile seems racy, retry a few times
                 retries = 3
+                print("using env for auth")
+                if cred:
+                    print("cred has been passed")
                 while True:
                     try:
                         cli_credential = cred or AzureCliCredential()
                         if not self.subscription_id:
-                            subscription_account = Service.fetch_subscription_for_resource_group(self.resource_group)
+                            print("self.subscriptionID not specified; passing credential")
+                            subscription_account = Service.fetch_subscription_for_resource_group(self.resource_group, cred=cli_credential)
                             if subscription_account:
                                 self.subscription_id = subscription_account.subscription_id
                                 self.tenant_id = subscription_account.tenant_id
                         else:
+                            print("subscription provided")
                             newconn = SubscriptionClient(cli_credential)
                         if connection_type != "blobstorage":
                             newconn = connection_types[connection_type]['cls'](cli_credential, self.subscription_id, api_version=connection_types[connection_type]['api_version'])
@@ -2898,6 +2903,7 @@ class Service(ServiceBase):
         # may need to retry if it was recently created
         while True:
             cred = DefaultAzureCredential()
+            print("passing defaultazurecredential")
             conn = self.connection('authorization', cred=cred)
             try:
                 roles = [_ for _ in conn.role_definitions.list(self._subscription_scope()) if role_name == _.role_name]
