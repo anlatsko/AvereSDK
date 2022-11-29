@@ -528,7 +528,7 @@ class Service(ServiceBase):
                 retries = 3
                 while True:
                     try:
-                        cli_credential = AzureCliCredential()
+                        cli_credential = cred or AzureCliCredential()
                         if not self.subscription_id:
                             subscription_account = Service.fetch_subscription_for_resource_group(self.resource_group)
                             if subscription_account:
