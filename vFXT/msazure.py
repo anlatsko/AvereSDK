@@ -380,14 +380,14 @@ class Service(ServiceBase):
 
         return True
     @staticmethod
-    def fetch_subscription_for_resource_group(res_grp=None):
+    def fetch_subscription_for_resource_group(res_grp=None, cred=None):
         """
         Input  : Name of resource group or None
         Output : First subscription which contains the resource group or
                  First subscription if input is None
         Returns an object of type azure.mgmt.resource.subscriptions
         """
-        cred = DefaultAzureCredential()
+        cred = cred or AzureCliCredential()
         newconn = SubscriptionClient(cred)
         subs_list = newconn.subscriptions.list()
         if not res_grp:
@@ -480,7 +480,7 @@ class Service(ServiceBase):
 
         default_api_version = None
         connection_types = {
-            'authorization': {'cls': azure.mgmt.authorization.AuthorizationManagementClient, 'pass_subscription': True, 'api_version': '2021-03-01-preview'},
+            'authorization': {'cls': azure.mgmt.authorization.AuthorizationManagementClient, 'pass_subscription': True, 'api_version': default_api_version},
             'blobstorage': None, # special handling below
             'compute': {'cls': azure.mgmt.compute.ComputeManagementClient, 'pass_subscription': True, 'api_version': default_api_version},
             'identity': {'cls': azure.mgmt.msi.ManagedServiceIdentityClient, 'pass_subscription': True, 'api_version': default_api_version},
@@ -530,7 +530,7 @@ class Service(ServiceBase):
                     try:
                         cli_credential = AzureCliCredential()
                         if not self.subscription_id:
-                            subscription_account = Service.fetch_subscription_for_resource_group(self.resource_group)
+                            subscription_account = Service.fetch_subscription_for_resource_group(self.resource_group, cred=cli_credential)
                             if subscription_account:
                                 self.subscription_id = subscription_account.subscription_id
                                 self.tenant_id = subscription_account.tenant_id
@@ -1162,7 +1162,7 @@ class Service(ServiceBase):
             raise vFXTConfigurationException("Instance {} has no identity configuration".format(self.name(instance)))
 
         principal_id = identity.principal_id
-        role_assignments = conn.role_assignments.list("principalId eq '{}'".format(principal_id))
+        role_assignments = conn.role_assignments.list(f"principalId eq '{principal_id}'")
         roles = [conn.role_definitions.get_by_id(_.properties.role_definition_id) for _ in role_assignments]
         custom_roles = [_ for _ in roles if _.role_type == 'CustomRole']
         if custom_roles:
@@ -2926,7 +2926,7 @@ class Service(ServiceBase):
             raise vFXTConfigurationException("No such role: {}".format(role_name))
         try:
             # must delete assignments first
-            assignments = [_ for _ in conn.role_assignments.list() if role.id == _.properties.role_definition_id]
+            assignments = conn.role_assignments.list(f"principalId eq '{role.id}'")
             for assignment in assignments:
                 # this will fail if we do not have permissions
                 conn.role_assignments.begin_delete(assignment.scope, assignment.name)
@@ -2956,7 +2956,7 @@ class Service(ServiceBase):
             association_id = str(uuid.uuid4())
             try:
                 conn = self.connection('authorization')
-                assignments = [_ for _ in conn.role_assignments.list() if role.id == _.properties.role_definition_id]
+                assignments = conn.role_assignments.list(f"principalId eq '{principal}'")
                 if principal in [_.principal_id for _ in assignments]:
                     log.debug("Assignment for role {} and principal {} exists.".format(role.role_name, principal))
                     return None
