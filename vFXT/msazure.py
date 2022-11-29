@@ -2901,6 +2901,8 @@ class Service(ServiceBase):
         '''Retrieve a role
         '''
         # may need to retry if it was recently created
+        print("GET ROLE")
+        print(role_name)
         while True:
             cred = DefaultAzureCredential()
             print("passing defaultazurecredential")
