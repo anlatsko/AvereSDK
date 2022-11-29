@@ -443,7 +443,7 @@ class Service(ServiceBase):
         except Exception as e:
             log.debug(e)
 
-    def connection(self, connection_type='compute', **options): #pylint: disable=arguments-differ
+    def connection(self, connection_type='compute', cred=None, **options): #pylint: disable=arguments-differ
         '''Connection factory, returns a new connection or thread local copy
 
             Arguments:
@@ -530,7 +530,7 @@ class Service(ServiceBase):
                     try:
                         cli_credential = AzureCliCredential()
                         if not self.subscription_id:
-                            subscription_account = Service.fetch_subscription_for_resource_group(self.resource_group, cred=cli_credential)
+                            subscription_account = Service.fetch_subscription_for_resource_group(self.resource_group)
                             if subscription_account:
                                 self.subscription_id = subscription_account.subscription_id
                                 self.tenant_id = subscription_account.tenant_id
@@ -2897,7 +2897,8 @@ class Service(ServiceBase):
         '''
         # may need to retry if it was recently created
         while True:
-            conn = self.connection('authorization')
+            cred = DefaultAzureCredential()
+            conn = self.connection('authorization', cred=cred)
             try:
                 roles = [_ for _ in conn.role_definitions.list(self._subscription_scope()) if role_name == _.role_name]
                 if roles and roles[0]:
