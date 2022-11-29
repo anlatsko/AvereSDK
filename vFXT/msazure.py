@@ -369,7 +369,7 @@ class Service(ServiceBase):
 
             Raises: vFXTConfigurationException
         '''
-        log.debug("Performing connection test")
+        log.debug("Performing connection test!!!")
 
         try:
             if not self.proxy: # proxy environments may block outgoing name resolution
