@@ -94,7 +94,7 @@ logging.getLogger('msrestazure.azure_active_directory').setLevel(logging.CRITICA
 logging.getLogger('keyring.backend').setLevel(logging.CRITICAL)
 
 import azure.identity
-from azure.identity import AzureCliCredential
+from azure.identity import AzureCliCredential, DefaultAzureCredential
 import azure.storage.blob
 import azure.storage.common
 import azure.common.client_factory
@@ -387,7 +387,7 @@ class Service(ServiceBase):
                  First subscription if input is None
         Returns an object of type azure.mgmt.resource.subscriptions
         """
-        cred = AzureCliCredential()
+        cred = DefaultAzureCredential()
         newconn = SubscriptionClient(cred)
         subs_list = newconn.subscriptions.list()
         if not res_grp:
@@ -480,7 +480,7 @@ class Service(ServiceBase):
 
         default_api_version = None
         connection_types = {
-            'authorization': {'cls': azure.mgmt.authorization.AuthorizationManagementClient, 'pass_subscription': True, 'api_version': '2018-01-01-preview'},
+            'authorization': {'cls': azure.mgmt.authorization.AuthorizationManagementClient, 'pass_subscription': True, 'api_version': '2021-03-01-preview'},
             'blobstorage': None, # special handling below
             'compute': {'cls': azure.mgmt.compute.ComputeManagementClient, 'pass_subscription': True, 'api_version': default_api_version},
             'identity': {'cls': azure.mgmt.msi.ManagedServiceIdentityClient, 'pass_subscription': True, 'api_version': default_api_version},
@@ -548,17 +548,7 @@ class Service(ServiceBase):
             else:
                 session = requests.sessions.Session()
                 session.proxies = proxies
-                cloud_environment = msrestazure.azure_cloud.get_cloud_from_metadata_endpoint(self.endpoint_base_url, session=session) if self.endpoint_base_url else None
-                if self.on_instance:
-                    if cloud_environment:
-                        creds = msrestazure.azure_active_directory.AADTokenCredentials(self.local.instance_data['access_token'], cloud_environment=cloud_environment)
-                    else:
-                        creds = msrestazure.azure_active_directory.AADTokenCredentials(self.local.instance_data['access_token'])
-                else:
-                    if cloud_environment:
-                        creds = azure.common.credentials.ServicePrincipalCredentials(self.application_id, self.application_secret, tenant=self.tenant_id, cloud_environment=cloud_environment)
-                    else:
-                        creds = azure.common.credentials.ServicePrincipalCredentials(self.application_id, self.application_secret, tenant=self.tenant_id)
+                creds = DefaultAzureCredential()
 
                 connection_args = {}
                 if options.get('api_version'):
@@ -1173,7 +1163,7 @@ class Service(ServiceBase):
 
         principal_id = identity.principal_id
         role_assignments = conn.role_assignments.list("principalId eq '{}'".format(principal_id))
-        roles = [conn.role_definitions.get_by_id(_.role_definition_id) for _ in role_assignments]
+        roles = [conn.role_definitions.get_by_id(_.properties.role_definition_id) for _ in role_assignments]
         custom_roles = [_ for _ in roles if _.role_type == 'CustomRole']
         if custom_roles:
             return custom_roles[0]
@@ -2936,7 +2926,7 @@ class Service(ServiceBase):
             raise vFXTConfigurationException("No such role: {}".format(role_name))
         try:
             # must delete assignments first
-            assignments = [_ for _ in conn.role_assignments.list() if role.id == _.role_definition_id]
+            assignments = [_ for _ in conn.role_assignments.list() if role.id == _.properties.role_definition_id]
             for assignment in assignments:
                 # this will fail if we do not have permissions
                 conn.role_assignments.begin_delete(assignment.scope, assignment.name)
@@ -2966,15 +2956,16 @@ class Service(ServiceBase):
             association_id = str(uuid.uuid4())
             try:
                 conn = self.connection('authorization')
-                assignments = [_ for _ in conn.role_assignments.list() if role.id == _.role_definition_id]
+                assignments = [_ for _ in conn.role_assignments.list() if role.id == _.properties.role_definition_id]
                 if principal in [_.principal_id for _ in assignments]:
                     log.debug("Assignment for role {} and principal {} exists.".format(role.role_name, principal))
                     return None
 
                 body = {
-                    'role_definition_id': role.id,
-                    'principal_id': principal,
-                    'principal_type': 'ServicePrincipal',
+                    'properties': {
+                        'role_definition_id': role.id,
+                        'principal_id': principal
+                    }
                 }
 
                 scope = self._resource_group_scope()
