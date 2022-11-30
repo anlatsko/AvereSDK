@@ -1166,9 +1166,9 @@ class Service(ServiceBase):
         if not getattr(identity, 'principal_id', None):
             raise vFXTConfigurationException("Instance {} has no identity configuration".format(self.name(instance)))
 
-        principal_id = identity.principal_id
-        role_assignments = conn.role_assignments.list(f"principalId eq '{principal_id}'")
-        roles = [conn.role_definitions.get_by_id(_.properties.role_definition_id) for _ in role_assignments]
+        # principal_id = identity.principal_id
+        role_assignments = conn.role_assignments.list_for_resource_group(self._instance_resource_group(instance))
+        roles = [conn.role_definitions.get_by_id(_.role_definition_id) for _ in role_assignments]
         custom_roles = [_ for _ in roles if _.role_type == 'CustomRole']
         if custom_roles:
             return custom_roles[0]
@@ -2935,7 +2935,8 @@ class Service(ServiceBase):
             raise vFXTConfigurationException("No such role: {}".format(role_name))
         try:
             # must delete assignments first
-            assignments = conn.role_assignments.list(f"principalId eq '{role.id}'")
+            # assignments = conn.role_assignments.list(f"principalId eq '{role.id}'")
+            assignments = conn.role_assignments.get_by_id(role.id)
             for assignment in assignments:
                 # this will fail if we do not have permissions
                 conn.role_assignments.begin_delete(assignment.scope, assignment.name)
@@ -2955,21 +2956,27 @@ class Service(ServiceBase):
 
             Raises: vFXTServiceFailure
         '''
+        cred = DefaultAzureCredential()
+        print("trying to use a default azure credential and pass it through when creating a role")
         retries = options.get('retries') or self.NEW_ROLE_FETCH_RETRY
-
+        print("assigning a role")
         role = self._get_role(role_name, retries=retries)
+        print(f"role is {role}")
         if not role:
             raise vFXTServiceFailure("Failed to find role {}".format(role_name))
 
         while True:
             association_id = str(uuid.uuid4())
+            print(f"associate id: {association_id}")
             try:
-                conn = self.connection('authorization')
-                assignments = conn.role_assignments.list(f"principalId eq '{principal}'")
+                conn = self.connection('authorization', cred=cred)
+                assignments = conn.role_assignments.get_by_id(role.id)
+                print(assignments)
                 if principal in [_.principal_id for _ in assignments]:
                     log.debug("Assignment for role {} and principal {} exists.".format(role.role_name, principal))
                     return None
-
+                print(f"role_definition_id: {role.id}")
+                print(f"principal: {principal}")
                 body = {
                     'properties': {
                         'role_definition_id': role.id,
