@@ -369,7 +369,7 @@ class Service(ServiceBase):
 
             Raises: vFXTConfigurationException
         '''
-        log.debug("Performing connection test!!!")
+        log.debug("Performing connection test")
 
         try:
             if not self.proxy: # proxy environments may block outgoing name resolution
@@ -2905,7 +2905,7 @@ class Service(ServiceBase):
         print(role_name)
         while True:
             cred = AzureCliCredential()
-            print("passing defaultazurecredential")
+            # print("passing defaultazurecredential")
             conn = self.connection('authorization', cred=cred)
             try:
                 roles = [_ for _ in conn.role_definitions.list(self._subscription_scope()) if role_name == _.role_name]
@@ -2970,9 +2970,10 @@ class Service(ServiceBase):
             print(f"associate id: {association_id}")
             try:
                 conn = self.connection('authorization', cred=cred)
-                assignments = conn.role_assignments.get_by_id(role.id)
-                print(assignments)
-                if principal in [_.principal_id for _ in assignments]:
+                assignment = conn.role_assignments.get_by_id(role.id)
+                print(assignment)
+                print(principal)
+                if principal in assignment.principal_id:
                     log.debug("Assignment for role {} and principal {} exists.".format(role.role_name, principal))
                     return None
                 print(f"role_definition_id: {role.id}")
@@ -2985,6 +2986,9 @@ class Service(ServiceBase):
                 }
 
                 scope = self._resource_group_scope()
+                print(scope)
+                print(association_id)
+                print(body)
                 r = conn.role_assignments.create(scope, association_id, body)
                 if not r:
                     raise Exception("Failed to assign role {} to principal {} for resource group {}".format(role_name, principal, self.resource_group))
