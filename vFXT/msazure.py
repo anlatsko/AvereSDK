@@ -2935,8 +2935,7 @@ class Service(ServiceBase):
             raise vFXTConfigurationException("No such role: {}".format(role_name))
         try:
             # must delete assignments first
-            # assignments = conn.role_assignments.list(f"principalId eq '{role.id}'")
-            assignments = conn.role_assignments.get_by_id(role.id)
+            assignments = conn.role_assignments.list_by_resource_group(self.resource_group)
             for assignment in assignments:
                 # this will fail if we do not have permissions
                 conn.role_assignments.begin_delete(assignment.scope, assignment.name)
@@ -2970,25 +2969,22 @@ class Service(ServiceBase):
             print(f"associate id: {association_id}")
             try:
                 conn = self.connection('authorization', cred=cred)
-                assignment = conn.role_assignments.get_by_id(role.id)
-                print(assignment)
-                print(principal)
-                if principal in assignment.principal_id:
+                assignments = conn.role_assignments.list_for_resource_group(self.resource_group)
+                print(assignments)
+                if principal in [_.principal_id for _ in assignments]:
                     log.debug("Assignment for role {} and principal {} exists.".format(role.role_name, principal))
                     return None
                 print(f"role_definition_id: {role.id}")
                 print(f"principal: {principal}")
                 body = {
-                    'properties': {
                         'role_definition_id': role.id,
                         'principal_id': principal
-                    }
                 }
 
                 scope = self._resource_group_scope()
-                print(scope)
-                print(association_id)
-                print(body)
+                print(f"scope: {scope}")
+                print(f"association_id: {association_id}")
+                print(f"body: {body}")
                 r = conn.role_assignments.create(scope, association_id, body)
                 if not r:
                     raise Exception("Failed to assign role {} to principal {} for resource group {}".format(role_name, principal, self.resource_group))
