@@ -480,7 +480,7 @@ class Service(ServiceBase):
 
         default_api_version = None
         connection_types = {
-            'authorization': {'cls': azure.mgmt.authorization.AuthorizationManagementClient, 'pass_subscription': True, 'api_version': "2022-04-01"},
+            'authorization': {'cls': azure.mgmt.authorization.AuthorizationManagementClient, 'pass_subscription': True, 'api_version': "2018-01-01-preview"},
             'blobstorage': None, # special handling below
             'compute': {'cls': azure.mgmt.compute.ComputeManagementClient, 'pass_subscription': True, 'api_version': default_api_version},
             'identity': {'cls': azure.mgmt.msi.ManagedServiceIdentityClient, 'pass_subscription': True, 'api_version': default_api_version},
@@ -2904,7 +2904,7 @@ class Service(ServiceBase):
         print("GET ROLE")
         print(role_name)
         while True:
-            cred = DefaultAzureCredential()
+            cred = AzureCliCredential()
             print("passing defaultazurecredential")
             conn = self.connection('authorization', cred=cred)
             try:
